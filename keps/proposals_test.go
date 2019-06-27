@@ -230,7 +230,7 @@ creation-date: 2018-04-15
 last-updated: 2018-04-24
 status: foo
 `,
-			expectedErrors: []error{fmt.Errorf("'foo' is not a valid status. The valid statuses are 'provisional', 'implementable', 'implemented', 'deferred', 'rejected', 'withdrawn', 'replaced'")},
+			expectedErrors: []error{fmt.Errorf("'foo' is not a valid status. Valid options are 'provisional', 'implementable', 'implemented', 'deferred', 'rejected', 'withdrawn', 'replaced'")},
 		},
 	}
 	for _, tc := range testcases {
@@ -242,7 +242,7 @@ status: foo
 			}
 			got := keps.Validate(kep)
 			if !reflect.DeepEqual(got, tc.expectedErrors) {
-				t.Errorf("expected errors: %v\ngot: %v", tc.expectedErrors, got)
+				t.Errorf("expected errors:\n%v\ngot:\n%v", tc.expectedErrors, got)
 			}
 		})
 

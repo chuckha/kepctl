@@ -103,48 +103,58 @@ func (p *Parser) Parse(in io.Reader) (*Proposal, error) {
 	return proposal, errors.WithStack(err)
 }
 
-func Validate(p *Proposal) []error {
-	var e []error
-	if p.Title == "" {
-		e = append(e, fmt.Errorf("title cannot be empty"))
-	}
-	if len(p.Authors) == 0 {
-		e = append(e, fmt.Errorf("authors list cannot be empty"))
-	}
-	if p.OwningSIG == "" {
-		e = append(e, fmt.Errorf("owning-sig cannot be empty"))
-	}
-	if len(p.Reviewers) == 0 {
-		e = append(e, fmt.Errorf("reviewers list cannot be empty"))
-	}
-	if len(p.Approvers) == 0 {
-		e = append(e, fmt.Errorf("approvers list cannot be empty"))
-	}
-	if p.CreationDate.IsZero() {
-		e = append(e, fmt.Errorf("creation date cannot be empty"))
-	}
-	if p.LastUpdated.IsZero() {
-		e = append(e, fmt.Errorf("last updated date cannot be empty"))
-	}
-	if !p.CreationDate.IsZero() && !p.LastUpdated.IsZero() && p.CreationDate.After(p.LastUpdated) {
-		e = append(e, fmt.Errorf("last updated date must be later than creation date"))
-	}
-	if p.Status == "" {
-		e = append(e, fmt.Errorf("status cannot be empty"))
-	}
-	if p.Status != "" && !isValidStatus(p.Status) {
-		e = append(e, fmt.Errorf("'%s' is not a valid status. The valid statuses are '%s'", p.Status, strings.Join(validProposalStatus, "', '")))
-	}
-	return e
-}
-
 var validProposalStatus = []string{"provisional", "implementable", "implemented", "deferred", "rejected", "withdrawn", "replaced"}
 
-func isValidStatus(status string) bool {
-	for _, s := range validProposalStatus {
-		if s == status {
-			return true
+func Validate(p *Proposal) []error {
+	var field fieldValidator
+	field.isNonEmpty("title", p.Title)
+	field.isNonEmptySlice("authors list", p.Authors)
+	field.isNonEmpty("owning-sig", p.OwningSIG)
+	field.isNonEmptySlice("reviewers list", p.Reviewers)
+	field.isNonEmptySlice("approvers list", p.Approvers)
+	field.isNonZeroTime("creation date", p.CreationDate)
+	field.isNonZeroTime("last updated date", p.LastUpdated)
+	if !p.LastUpdated.IsZero() && !p.CreationDate.IsZero() {
+		field.isAfter("last updated date", "creation date", p.LastUpdated, p.CreationDate)
+	}
+	field.isNonEmpty("status", p.Status)
+	if p.Status != "" {
+		field.isOneOf("status", p.Status, validProposalStatus)
+	}
+	return []error(field)
+}
+
+type fieldValidator []error
+
+func (fv *fieldValidator) isNonEmpty(field, value string) {
+	if value == "" {
+		*fv = append(*fv, fmt.Errorf("%s cannot be empty", field))
+	}
+}
+
+func (fv *fieldValidator) isNonEmptySlice(field string, value []string) {
+	if len(value) == 0 {
+		*fv = append(*fv, fmt.Errorf("%s cannot be empty", field))
+	}
+}
+
+func (fv *fieldValidator) isNonZeroTime(field string, t time.Time) {
+	if t.IsZero() {
+		*fv = append(*fv, fmt.Errorf("%s cannot be empty", field))
+	}
+}
+
+func (fv *fieldValidator) isOneOf(field, value string, validValues []string) {
+	for _, v := range validValues {
+		if value == v {
+			return
 		}
 	}
-	return false
+	*fv = append(*fv, fmt.Errorf("'%s' is not a valid %s. Valid options are '%s'", value, field, strings.Join(validValues, "', '")))
+}
+
+func (fv *fieldValidator) isAfter(field1, field2 string, value1, value2 time.Time) {
+	if !value1.After(value2) {
+		*fv = append(*fv, fmt.Errorf("%s must be later than %s", field1, field2))
+	}
 }
