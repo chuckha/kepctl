@@ -2,6 +2,7 @@ package keps
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"sort"
 	"strings"
@@ -100,4 +101,50 @@ func (p *Parser) Parse(in io.Reader) (*Proposal, error) {
 	proposal := &Proposal{}
 	err := yaml.Unmarshal(metadata, proposal)
 	return proposal, errors.WithStack(err)
+}
+
+func Validate(p *Proposal) []error {
+	var e []error
+	if p.Title == "" {
+		e = append(e, fmt.Errorf("title cannot be empty"))
+	}
+	if len(p.Authors) == 0 {
+		e = append(e, fmt.Errorf("authors list cannot be empty"))
+	}
+	if p.OwningSIG == "" {
+		e = append(e, fmt.Errorf("owning-sig cannot be empty"))
+	}
+	if len(p.Reviewers) == 0 {
+		e = append(e, fmt.Errorf("reviewers list cannot be empty"))
+	}
+	if len(p.Approvers) == 0 {
+		e = append(e, fmt.Errorf("approvers list cannot be empty"))
+	}
+	if p.CreationDate.IsZero() {
+		e = append(e, fmt.Errorf("creation date cannot be empty"))
+	}
+	if p.LastUpdated.IsZero() {
+		e = append(e, fmt.Errorf("last updated date cannot be empty"))
+	}
+	if !p.CreationDate.IsZero() && !p.LastUpdated.IsZero() && p.CreationDate.After(p.LastUpdated) {
+		e = append(e, fmt.Errorf("last updated date must be later than creation date"))
+	}
+	if p.Status == "" {
+		e = append(e, fmt.Errorf("status cannot be empty"))
+	}
+	if p.Status != "" && !isValidStatus(p.Status) {
+		e = append(e, fmt.Errorf("'%s' is not a valid status. The valid statuses are '%s'", p.Status, strings.Join(validProposalStatus, "', '")))
+	}
+	return e
+}
+
+var validProposalStatus = []string{"provisional", "implementable", "implemented", "deferred", "rejected", "withdrawn", "replaced"}
+
+func isValidStatus(status string) bool {
+	for _, s := range validProposalStatus {
+		if s == status {
+			return true
+		}
+	}
+	return false
 }
